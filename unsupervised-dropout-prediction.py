@@ -10,6 +10,7 @@ import os
 import pdfkit
 import time
 import os.path as op
+import matplotlib.pyplot as plt
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email.mime.text import MIMEText
