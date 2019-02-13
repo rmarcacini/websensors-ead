@@ -2,9 +2,9 @@
 
 **Websensors-EAD** tool analyzes student access data in online distance learning environments such as Moodle, MOOCS, etc. The goal is to identify **dropout patterns** and organize students into four dropout risk groups: critical, high, medium, and low. Websensors-EAD uses regularization in heterogeneous networks [1] as a machine learning method to analyze school dropout patterns.
 
-Websensors-EAD is a research project at the Laboratory of Scientific Computing (Lives) of the Federal University of Mato Grosso do Sul, Brazil.
+Websensors-EAD is part of the [Websensors Analytics](https://websensors.net.br) research project, developed at the [Laboratory of Scientific Computing (Lives)](http://lives.ufms.br) of the Federal University of Mato Grosso do Sul (UFMS), Três Lagoas, Brazil.
 
-The source code of the tool is free for use for academic purposes. If the purpose is to use for private purposes, contact the project team.
+The Websensors-EAD source code is free for academic purposes. For private purposes, contact the project team.
 
 
 ## Data preparation
