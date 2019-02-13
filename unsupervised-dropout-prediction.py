@@ -3,26 +3,19 @@
 import sys
 import random
 import numpy as np
-import json
-import numpy as np
 import pandas as pd
-from sklearn import preprocessing
-from flask import Flask
-from flask import request
-from flask import jsonify
 import datetime
 import json
 import os
-import matplotlib.pyplot as plt
 import pdfkit
 import time
+import os.path as op
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email.mime.text import MIMEText
 from email.utils import COMMASPACE, formatdate
 from email import encoders
-import os.path as op
-import datetime
+
 
 class Net:
     
@@ -137,11 +130,22 @@ def walking(graph, regularizer, max=1000, convergence=0.001):
     nodes = list(graph.getNodes().keys())
     iteration = 1
     print('Starting...')
+
     while(True):
+        
         loss = 0
         random.shuffle(nodes)
+        
+        # student layer
         for nodeKey in nodes:
-            loss += regularizer.propagate(graph,nodeKey)
+            if("student" in nodeKey):
+                loss += regularizer.propagateAction2Student(graph,nodeKey)
+        
+        # action layer
+        for nodeKey in nodes:
+            if("action" in nodeKey):
+                loss += regularizer.propagateStudent2Action(graph,nodeKey)
+
         print('Iteration '+str(iteration)+" | Loss="+str(loss))
         iteration+=1
         if(iteration >= max): break
@@ -153,40 +157,72 @@ class GraphRegularizationDropoutProfile:
     def __init__(self, maxPathSize=7):
         self.maxPathSize = maxPathSize
 
-    
-    def propagate(self,graph,nodeKey):        
-        stack = []
-        stack.append(nodeKey)
-        pathSize = 1
-        loss = 0
-        
-        while(len(stack) > 0):
-            tempNode = stack.pop()
-            loss += self.regularizerFunction(graph,tempNode)
-            if(pathSize < self.maxPathSize):
-                nextNode = self.jump(graph,tempNode)
-                if(nextNode==None): continue
-                stack.append(nextNode)
-                pathSize += 1
-        
-        return loss
-    
-    def regularizerFunction(self,graph,nodeKey):
+    def propagateAction2Student(self,graph,nodeKey):
         nodes = graph.getNodes()
-        f = nodes[nodeKey].getF()
+        f_student = nodes[nodeKey].getF()
         loss = 0
-        if(nodes[nodeKey].isLabeled()==False):
-            f_new = np.array([0]*len(f))
+        
+        #print("node = "+nodeKey)
+        #print("f = "+str(f_student))
+        
+        max_student_action_weight = 0
+        for nodeIn in nodes[nodeKey].getIn():
+            student_action_weight = nodes[nodeIn].getWeightedInDegree()
+            if(student_action_weight > max_student_action_weight): max_student_action_weight = student_action_weight
             
-            for nodeIn in nodes[nodeKey].getIn():
-                f_in = (nodes[nodeIn].getF() / nodes[nodeIn].getWeightedOutDegree())
-                weight = nodes[nodeKey].getIn()[nodeIn]
-                f_new = f_new + (weight*f_in)
-            if(nodes[nodeIn].isLabeled()==False):
-                f_new = (f_new/(nodes[nodeKey].getWeightedInDegree()))
-            loss = np.sum(np.abs(f - f_new))
-            nodes[nodeKey].setF(f_new)
+        f_new = np.array([0]*len(f_student))
+        for nodeIn in nodes[nodeKey].getIn():
+            f_action = nodes[nodeIn].getF()
+            student_action_weight = nodes[nodeKey].getIn()[nodeIn]
+            student_action_weight_norm = student_action_weight / max_student_action_weight
+            f_new = f_new + f_action*student_action_weight_norm
+
+        loss = np.sum(np.abs(f_student - f_new))
+        nodes[nodeKey].setF(f_new)
+            
+        #print("f_new = "+str(f_new))        
+        
         return loss
+
+    def propagateStudent2Action(self,graph,nodeKey):
+        nodes = graph.getNodes()
+        f_action = nodes[nodeKey].getF()
+        loss = 0
+        
+        #print("node = "+nodeKey)
+        #print("f = "+str(f_action))
+        
+        max_student_degree = 0
+        max_student_action_weight = 0
+        for nodeIn in nodes[nodeKey].getIn():
+            student_degree = nodes[nodeIn].getOutDegree()
+            student_action_weight = nodes[nodeKey].getIn()[nodeIn]
+            if(student_degree > max_student_degree): max_student_degree = student_degree
+            if(student_action_weight > max_student_action_weight): max_student_action_weight = student_action_weight
+            
+        f_new = np.array([0]*len(f_action))
+        for nodeIn in nodes[nodeKey].getIn():
+            f_student = nodes[nodeIn].getF()
+                
+            student_degree = nodes[nodeIn].getOutDegree()
+            student_degree_norm = student_degree/max_student_degree
+                
+            student_action_weight = nodes[nodeKey].getIn()[nodeIn]
+            student_action_weight_norm = student_action_weight / max_student_action_weight
+                
+            f_new = f_new + f_action*0.9 + ((student_degree_norm*student_action_weight_norm)*f_student)*0.1
+        
+        f_new = (f_new/(nodes[nodeKey].getInDegree()))
+            
+        loss = np.sum(np.abs(f_action - f_new))
+        nodes[nodeKey].setF(f_new)
+            
+        #print("f_new = "+str(f_new))        
+        
+        return loss
+
+    
+
         
         
     def jump(self,graph,nodeKey):
@@ -196,8 +232,7 @@ class GraphRegularizationDropoutProfile:
             return nextNodes[0]
         else: return None
 
-
-
+        
 def load(csv_data):
     
     courses = {}
@@ -297,6 +332,7 @@ def dropout_risk(graphs, minStudents):
         
         
         output[course]['f_total']=list(f_total)
+        print("f_total"+str(f_total))
         output[course]['students']=students
 
         quantiles = df.risk_factor.quantile([0.05,0.1,0.15])
@@ -340,13 +376,43 @@ def dropout_risk(graphs, minStudents):
     return output
         
     
+coursesName = {}
+def readCourses(csv_data):
+    index=0
+    with open(csv_data) as fileobj:
+        for line in fileobj:
+            if(len(line.strip())==0): continue
+            data = line.strip().split(';')
+            if(len(data)!=2):
+                print("Error in data input. Line "+str(index)+" ["+line.strip()+"]")
+                sys.exit(-1)
+            index+=1
+            coursesName[data[0]]=data[1]
+
 
 def getCourseName(course):
-    return 'Curso '+course
+    s = course.split(":")[0]
+    if( s in coursesName): return coursesName[s]
+    return 'Course '+s
 
+
+studentsName = {}
+def readStudents(csv_data):
+    index=0
+    with open(csv_data) as fileobj:
+        for line in fileobj:
+            if(len(line.strip())==0): continue
+            data = line.strip().split(';')
+            if(len(data)!=2):
+                print("Error in data input. Line "+str(index)+" ["+line.strip()+"]")
+                sys.exit(-1)
+            index+=1
+            studentsName[data[0]]=data[1]
 
 def getStudentName(student):
-    return 'Student '+student
+    s = student.split(":")[0]
+    if( s in studentsName): return studentsName[s]
+    return 'Student '+s
 
 
 def getReport(dropout):
@@ -358,7 +424,7 @@ def getReport(dropout):
 
     f1=open('./report.html', 'a')
         
-    types = ['critical','high']
+    types = ['critical','high', 'medium', 'low']
 
 
     s = "<html><head>  <title>Websensors</title>  <meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\">   <style type=\"text/css\">   body {font-family: \"Trebuchet MS\", Arial, sans-serif;}  </style> </head><table border=0 cellpadding=\"20\" cellspacing=\"0\" bgcolor=\"#273140\" width=\"100%\"><tr><td align=\"center\"><font color=\"white\" style=\"font-family: 'Russo One', sans-serif; font-size: 220%;\">Websensors - School Dropout Prediction (Report)</font></td></tr></table>\n"
@@ -416,9 +482,9 @@ def getReport(dropout):
     plt.axis('equal')
     plt.title('School Dropout Risk')
     plt.savefig('pie.png')   # save the figure to file
-
-
-
+    
+    
+    
 def sendMail(mail_from,mail_to,mail_smtp,mail_password,mail_message):
     # create message object instance
     msg = MIMEMultipart()
@@ -462,12 +528,12 @@ def sendMail(mail_from,mail_to,mail_smtp,mail_password,mail_message):
 
 
 
-# In[85]:
-
-
+    
 def websensors(config):
 
-    graphs = load(config['input'])
+    graphs = load(config['clickstream'])
+    readStudents(config['students'])
+    readCourses(config['courses'])
 
     for course in graphs:
         regularizer = GraphRegularizationDropoutProfile(maxPathSize=config['net_regularizer_path_size'])
@@ -478,10 +544,8 @@ def websensors(config):
 
     pdfkit.from_file('report.html', 'report.pdf')
 
-    sendMail(config['mail_from'],config['mail_to'],config['mail_smtp'],config['mail_pass'],config['mail_text'])
-
-
-
+    if(config['mail_report']==True):
+        sendMail(config['mail_from'],config['mail_to'],config['mail_smtp'],config['mail_pass'],config['mail_text'])
 
 #################################################################
 #################################################################
@@ -492,18 +556,21 @@ def websensors(config):
 #################################################################
 config={}
 # student patterns file
-config['input']='students-patterns.csv'
+config['clickstream']='data/students-patterns.csv'
+config['courses']='data/courses.csv'
+config['students']='data/students.csv'
 
 # machine learning configuration
-config['net_regularizer_path_size']=3
-config['net_regularizer_max_iterations']=10
+config['net_regularizer_path_size']=100
+config['net_regularizer_max_iterations']=100
 config['min_students_by_course']=10
 
 # notification parameters
-config['mail_from']='email1@gmail.com'
-config['mail_to']='email2@gmail.com'
+config['mail_report']=False
+config['mail_from']='abc@gmail.com'
+config['mail_to']='123@gmail.com'
 config['mail_smtp']='smtp.gmail.com: 587'
-config['mail_pass']='password'
+config['mail_pass']='12345'
 config['mail_text']="Dear administrator,\n\nI'm attaching the School Dropout Prediction Report.\n\nI suggest the application of mitigation policies for students classified in the 'critical' and 'high' risk group.\n\nRegards,\nWebsensors-EAD AI Bot.\n[I'm a bot. Do not answer this message.]"
 
 
@@ -513,5 +580,3 @@ config['mail_text']="Dear administrator,\n\nI'm attaching the School Dropout Pre
 # Running
 
 websensors(config)
-
-
