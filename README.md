@@ -58,10 +58,11 @@ If you want Websensors-EAD to send a PDF report (via e-mail) to students who are
 
 ## Running Websensors-EAD
 
-To run Websensors-EAD, install the numpy and pandas libraries for Python 3.
+To run Websensors-EAD, install the numpy, pandas and matplotlib libraries for Python 3.
 
 * pip install numpy
 * pip install pandas
+* pip install matplotlib
 
 Run the **unsupervised-dropout-prediction.py** script:
 
