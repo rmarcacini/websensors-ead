@@ -39,7 +39,7 @@ Edit the **unsupervised-dropout-prediction.py** file and change the following li
 
 > config['min_students_by_course']=10
 
-If you want Websensors-EAD to send a PDF report (via e-mail) to students who are at risk of dropout, change the config['mail_report'] setting to True and informs your smtp configuration.
+If you want Websensors-EAD to send a PDF school dropout risk report (via e-mail), change the config['mail_report'] setting to True and informs your smtp configuration.
 
 > \# **notification parameters**
 
