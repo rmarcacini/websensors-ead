@@ -9,11 +9,11 @@ The Websensors-EAD source code is free for academic purposes. For private purpos
 
 ## Data preparation
 
-The data input of the Websensors-EAD is the students access log of the online learning environment system. The data should be tabulated in a CSV format, using the character ";" as a delimiter. The data must have five columns: access identifier (unique), date or timestamp, student id, course id, and resource name.
+The input data of the Websensors-EAD is the students access log of the online learning environment system. The data should be tabulated in a CSV format, using the character ";" as a delimiter. The data must have five columns: access identifier (unique), date or timestamp, student id, course id, and resource name.
 
 The data directory contains an example of an input file.
 
-In practice, Websensors-EAD analyzes input patterns as a clickstream graph. A clickstream is a list of all the educational resources viewed by a student (e.g. videos, tasks, foruns, quiz, etc), presented in the order the resources were viewed, also defined as the succession of mouse clicks that each student makes. An example of a clickstream graph is shown in the figure below.
+In practice, Websensors-EAD analyzes students log as a clickstream graph. A clickstream is a list of all the educational resources viewed by a student (e.g. videos, tasks, foruns, quiz, etc), presented in the order the resources were viewed, also defined as the succession of mouse clicks that each student makes. An example of a clickstream graph is shown in the figure below.
 
 ![Example of a Clickstream Graph (From [1])](https://i.imgur.com/HnJkMge.png)
 
